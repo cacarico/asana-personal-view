@@ -1,5 +1,7 @@
 // background.js — Storage management, context menu, message routing
 
+const browser = globalThis.browser || globalThis.chrome;
+
 // --- Storage helpers ---
 
 async function getBoards() {

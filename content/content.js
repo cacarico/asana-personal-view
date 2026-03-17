@@ -1,4 +1,6 @@
-// content.js — DOM observation, column detection, CSS hiding
+// content.js — DOM observation, column detection, direct DOM hiding
+
+const browser = globalThis.browser || globalThis.chrome;
 
 // --- URL parsing ---
 
@@ -27,17 +29,20 @@ function isBoardView() {
 
 function getColumns() {
   // Headers are in BoardBody-headerDraggableItemWrapper elements.
-  // Each contains a BoardGroupHeader with an H2 for the column name.
-  // Exclude the BoardAddSection (add column button).
+  // Column bodies are in BoardBody-columnDraggableItemWrapper elements.
+  // Both lists share the same order and count.
   const headerWrappers = document.querySelectorAll(
     '.BoardBody-headerDraggableItemWrapper'
+  );
+  const bodyWrappers = document.querySelectorAll(
+    '.BoardBody-columnDraggableItemWrapper'
   );
 
   return Array.from(headerWrappers)
     .map((el, index) => {
       const h2 = el.querySelector('.BoardGroupHeaderContents h2');
       const name = h2 ? h2.textContent.trim() : "";
-      return { name, element: el, index };
+      return { name, headerElement: el, bodyElement: bodyWrappers[index] || null, index };
     })
     .filter((col) => col.name !== "");
 }
@@ -49,55 +54,29 @@ function getBoardName() {
   return heading ? heading.textContent.trim() : "Unknown Board";
 }
 
-// --- CSS injection for hiding columns ---
-
-const STYLE_ID = "asana-personal-view-styles";
-
-function getOrCreateStyleElement() {
-  let style = document.getElementById(STYLE_ID);
-  if (!style) {
-    style = document.createElement("style");
-    style.id = STYLE_ID;
-    document.head.appendChild(style);
-  }
-  return style;
-}
+// --- Direct DOM hiding for columns ---
 
 function applyHiddenColumns(hiddenColumnNames) {
-  const style = getOrCreateStyleElement();
-
-  if (showAllMode || hiddenColumnNames.length === 0) {
-    style.textContent = "";
-    return;
-  }
-
   const columns = getColumns();
-  const rules = [];
 
   columns.forEach((col) => {
-    if (hiddenColumnNames.includes(col.name)) {
-      // nth-child is 1-based; col.index is 0-based position among header wrappers.
-      // Headers and column bodies are in separate SortableLists but share the same index.
-      const nth = col.index + 1;
-      // Hide the header wrapper (in the header sortable list)
-      rules.push(
-        `.BoardBody-columnSortableList > .BoardBody-headerDraggableItemWrapper:nth-child(${nth}) { display: none !important; }`
-      );
-      // Hide the column body wrapper (in the column sortable list)
-      rules.push(
-        `.BoardBody-columnSortableList > .BoardBody-columnDraggableItemWrapper:nth-child(${nth}) { display: none !important; }`
-      );
+    const shouldHide = !showAllMode && hiddenColumnNames.includes(col.name);
+    const display = shouldHide ? "none" : "";
+    col.headerElement.style.display = display;
+    if (col.bodyElement) {
+      col.bodyElement.style.display = display;
     }
   });
-
-  style.textContent = rules.join("\n");
 }
 
 function removeAllHiding() {
-  const style = document.getElementById(STYLE_ID);
-  if (style) {
-    style.textContent = "";
-  }
+  const columns = getColumns();
+  columns.forEach((col) => {
+    col.headerElement.style.display = "";
+    if (col.bodyElement) {
+      col.bodyElement.style.display = "";
+    }
+  });
 }
 
 // --- Main observation loop ---

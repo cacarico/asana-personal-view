@@ -1,5 +1,7 @@
 // popup.js — Column toggle UI
 
+const browser = globalThis.browser || globalThis.chrome;
+
 let currentBoardId = null;
 let currentBoardName = "";
 let showAllActive = false;
