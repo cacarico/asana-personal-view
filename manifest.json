@@ -1,0 +1,27 @@
+{
+  "manifest_version": 3,
+  "name": "Asana Personal View",
+  "version": "0.1.0",
+  "description": "Hide columns on Asana boards for a personalized view",
+  "permissions": ["storage", "contextMenus"],
+  "host_permissions": ["*://app.asana.com/*"],
+  "background": {
+    "scripts": ["background.js"]
+  },
+  "content_scripts": [
+    {
+      "matches": ["*://app.asana.com/*"],
+      "js": ["content/content.js"],
+      "css": ["content/content.css"]
+    }
+  ],
+  "action": {
+    "default_popup": "popup/popup.html",
+    "default_icon": {
+      "48": "icons/icon-48.svg"
+    }
+  },
+  "icons": {
+    "48": "icons/icon-48.svg"
+  }
+}
