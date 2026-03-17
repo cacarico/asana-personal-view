@@ -125,6 +125,16 @@ observer.observe(document.body, {
 // Initial check
 onBoardChanged();
 
+// --- URL change detection for SPA navigation ---
+let lastUrl = window.location.href;
+
+setInterval(() => {
+  if (window.location.href !== lastUrl) {
+    lastUrl = window.location.href;
+    debouncedBoardCheck();
+  }
+}, 500);
+
 // --- Right-click tracking ---
 
 document.addEventListener("contextmenu", (e) => {
