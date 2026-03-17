@@ -2,6 +2,16 @@
 
 const browser = globalThis.browser || globalThis.chrome;
 
+// --- Validation helpers ---
+
+function isValidBoardId(boardId) {
+  return typeof boardId === "string" && /^\d+$/.test(boardId);
+}
+
+function isValidColumnName(name) {
+  return typeof name === "string" && name.length > 0 && name.length <= 500;
+}
+
 // --- Storage helpers ---
 
 async function getBoards() {
@@ -41,9 +51,11 @@ async function showColumn(boardId, columnName) {
 }
 
 async function resetBoard(boardId) {
-  const boardData = await getBoardData(boardId);
-  boardData.hiddenColumns = [];
-  await saveBoardData(boardId, boardData);
+  const boards = await getBoards();
+  if (!boards[boardId]) return;
+  boards[boardId].hiddenColumns = [];
+  boards[boardId].lastVisited = new Date().toISOString();
+  await browser.storage.local.set({ boards });
 }
 
 // --- Context menu ---
@@ -64,6 +76,8 @@ browser.contextMenus.onClicked.addListener(async (info, tab) => {
 });
 
 // --- Message handling ---
+// Uses sendResponse pattern for Chrome compatibility (chrome.runtime.onMessage
+// does not support returning Promises from listeners).
 
 async function getActiveTabId(sender) {
   if (sender.tab) return sender.tab.id;
@@ -71,39 +85,56 @@ async function getActiveTabId(sender) {
   return tab ? tab.id : null;
 }
 
-browser.runtime.onMessage.addListener(async (message, sender) => {
-  switch (message.type) {
-    case "GET_BOARD_DATA": {
-      const boardData = await getBoardData(message.boardId);
-      return boardData;
-    }
-    case "HIDE_COLUMN": {
-      const hidden = await hideColumn(message.boardId, message.boardName, message.columnName);
-      const tabId = await getActiveTabId(sender);
-      if (tabId) updateBadge(tabId, hidden.length);
-      return { hiddenColumns: hidden };
-    }
-    case "SHOW_COLUMN": {
-      const hidden = await showColumn(message.boardId, message.columnName);
-      const tabId = await getActiveTabId(sender);
-      if (tabId) updateBadge(tabId, hidden.length);
-      return { hiddenColumns: hidden };
-    }
-    case "RESET_BOARD": {
-      await resetBoard(message.boardId);
-      const tabId = await getActiveTabId(sender);
-      if (tabId) updateBadge(tabId, 0);
-      return { hiddenColumns: [] };
-    }
-    case "UPDATE_BADGE": {
-      const tabId = await getActiveTabId(sender);
-      if (tabId) updateBadge(tabId, message.count);
-      return true;
-    }
-    default:
-      return false;
+function handleMessage(message, sender, sendResponse) {
+  if (!message || typeof message.type !== "string") {
+    sendResponse(false);
+    return false;
   }
-});
+
+  const handler = async () => {
+    switch (message.type) {
+      case "GET_BOARD_DATA": {
+        if (!isValidBoardId(message.boardId)) return false;
+        return await getBoardData(message.boardId);
+      }
+      case "HIDE_COLUMN": {
+        if (!isValidBoardId(message.boardId) || !isValidColumnName(message.columnName)) return false;
+        const boardName = typeof message.boardName === "string" ? message.boardName.slice(0, 500) : "";
+        const hidden = await hideColumn(message.boardId, boardName, message.columnName);
+        const tabId = await getActiveTabId(sender);
+        if (tabId) updateBadge(tabId, hidden.length);
+        return { hiddenColumns: hidden };
+      }
+      case "SHOW_COLUMN": {
+        if (!isValidBoardId(message.boardId) || !isValidColumnName(message.columnName)) return false;
+        const hidden = await showColumn(message.boardId, message.columnName);
+        const tabId = await getActiveTabId(sender);
+        if (tabId) updateBadge(tabId, hidden.length);
+        return { hiddenColumns: hidden };
+      }
+      case "RESET_BOARD": {
+        if (!isValidBoardId(message.boardId)) return false;
+        await resetBoard(message.boardId);
+        const tabId = await getActiveTabId(sender);
+        if (tabId) updateBadge(tabId, 0);
+        return { hiddenColumns: [] };
+      }
+      case "UPDATE_BADGE": {
+        const count = typeof message.count === "number" ? message.count : 0;
+        const tabId = await getActiveTabId(sender);
+        if (tabId) updateBadge(tabId, count);
+        return true;
+      }
+      default:
+        return false;
+    }
+  };
+
+  handler().then(sendResponse).catch(() => sendResponse(false));
+  return true; // Keep message channel open for async sendResponse
+}
+
+browser.runtime.onMessage.addListener(handleMessage);
 
 function updateBadge(tabId, count) {
   if (count > 0) {

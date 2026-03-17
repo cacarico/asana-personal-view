@@ -1,6 +1,6 @@
 # Asana Personal View
 
-A Firefox extension that lets you hide columns on Asana board views for a personalized experience. Your team's board has columns you don't use? Hide them — your preferences are saved per-board and persist across sessions.
+A Firefox extension that lets you hide columns on Asana board views for a personalized experience. Your team's board has columns you don't use? Hide them, your preferences are saved per-board and persist across sessions.
 
 ## Features
 

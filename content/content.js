@@ -19,18 +19,19 @@ function getBoardIdFromUrl() {
 let currentBoardId = null;
 let showAllMode = false;
 let lastRightClickedColumn = null;
+let boardChangeInFlight = false;
 
 // --- Board detection ---
 
+function getBoardContainer() {
+  return document.querySelector('.BoardBody-dragSelectContainer');
+}
+
 function isBoardView() {
-  // BoardBody-dragSelectContainer is the main board area
-  return document.querySelector('.BoardBody-dragSelectContainer') !== null;
+  return getBoardContainer() !== null;
 }
 
 function getColumns() {
-  // Headers are in BoardBody-headerDraggableItemWrapper elements.
-  // Column bodies are in BoardBody-columnDraggableItemWrapper elements.
-  // Both lists share the same order and count.
   const headerWrappers = document.querySelectorAll(
     '.BoardBody-headerDraggableItemWrapper'
   );
@@ -38,17 +39,18 @@ function getColumns() {
     '.BoardBody-columnDraggableItemWrapper'
   );
 
-  return Array.from(headerWrappers)
-    .map((el, index) => {
-      const h2 = el.querySelector('.BoardGroupHeaderContents h2');
-      const name = h2 ? h2.textContent.trim() : "";
-      return { name, headerElement: el, bodyElement: bodyWrappers[index] || null, index };
-    })
-    .filter((col) => col.name !== "");
+  const columns = [];
+  headerWrappers.forEach((el, index) => {
+    const h2 = el.querySelector('.BoardGroupHeaderContents h2');
+    const name = h2 ? h2.textContent.trim() : null;
+    if (name) {
+      columns.push({ name, headerElement: el, bodyElement: bodyWrappers[index] || null });
+    }
+  });
+  return columns;
 }
 
 function getBoardName() {
-  // Try common project header selectors
   const heading = document.querySelector('h1[class*="Typography"]') ||
     document.querySelector('[class*="ProjectHeader"] h1');
   return heading ? heading.textContent.trim() : "Unknown Board";
@@ -84,17 +86,20 @@ function removeAllHiding() {
 let debounceTimer = null;
 
 async function onBoardChanged() {
-  const boardId = getBoardIdFromUrl();
-  if (!boardId || !isBoardView()) {
-    currentBoardId = null;
-    removeAllHiding();
-    browser.runtime.sendMessage({ type: "UPDATE_BADGE", count: 0 }).catch(() => {});
-    return;
-  }
-
-  currentBoardId = boardId;
+  if (boardChangeInFlight) return;
+  boardChangeInFlight = true;
 
   try {
+    const boardId = getBoardIdFromUrl();
+    if (!boardId || !isBoardView()) {
+      currentBoardId = null;
+      removeAllHiding();
+      browser.runtime.sendMessage({ type: "UPDATE_BADGE", count: 0 }).catch(() => {});
+      return;
+    }
+
+    currentBoardId = boardId;
+
     const boardData = await browser.runtime.sendMessage({
       type: "GET_BOARD_DATA",
       boardId,
@@ -107,7 +112,9 @@ async function onBoardChanged() {
       count: (boardData.hiddenColumns || []).length,
     }).catch(() => {});
   } catch (e) {
-    // Background script may not be ready yet
+    console.warn("[Asana Personal View] board check failed:", e.message);
+  } finally {
+    boardChangeInFlight = false;
   }
 }
 
@@ -116,51 +123,70 @@ function debouncedBoardCheck() {
   debounceTimer = setTimeout(onBoardChanged, 300);
 }
 
-// --- MutationObserver ---
+// --- MutationObserver (scoped to board container when possible) ---
 
-const observer = new MutationObserver(debouncedBoardCheck);
+let observer = null;
 
-observer.observe(document.body, {
-  childList: true,
-  subtree: true,
-});
+function startObserver() {
+  if (observer) observer.disconnect();
+
+  const target = getBoardContainer() || document.body;
+  observer = new MutationObserver(debouncedBoardCheck);
+  observer.observe(target, { childList: true, subtree: true });
+}
+
+startObserver();
 
 // Initial check
 onBoardChanged();
 
-// --- URL change detection for SPA navigation ---
+// --- SPA navigation detection ---
+
 let lastUrl = window.location.href;
 
-setInterval(() => {
+window.addEventListener("popstate", () => {
   if (window.location.href !== lastUrl) {
     lastUrl = window.location.href;
+    startObserver();
     debouncedBoardCheck();
   }
-}, 500);
+});
+
+// Asana uses pushState/replaceState for navigation — intercept them
+for (const method of ["pushState", "replaceState"]) {
+  const original = history[method];
+  history[method] = function (...args) {
+    const result = original.apply(this, args);
+    if (window.location.href !== lastUrl) {
+      lastUrl = window.location.href;
+      startObserver();
+      debouncedBoardCheck();
+    }
+    return result;
+  };
+}
 
 // --- Right-click tracking ---
 
 document.addEventListener("contextmenu", (e) => {
-  // Check if right-click is on a column header area or column body
   const headerWrapper = e.target.closest('.BoardBody-headerDraggableItemWrapper');
   const columnWrapper = e.target.closest('.BoardBody-columnDraggableItemWrapper');
   const target = headerWrapper || columnWrapper;
 
   if (target) {
-    // If clicked on header, get name directly; if on column body, find matching header by index
     const h2 = headerWrapper
       ? headerWrapper.querySelector('.BoardGroupHeaderContents h2')
       : null;
     if (h2) {
       lastRightClickedColumn = h2.textContent.trim();
     } else if (columnWrapper) {
-      // Find the index of this column wrapper among its siblings
       const parent = columnWrapper.parentElement;
-      const siblings = Array.from(parent.querySelectorAll('.BoardBody-columnDraggableItemWrapper'));
+      const siblings = Array.from(parent.children).filter(
+        (el) => el.classList.contains('BoardBody-columnDraggableItemWrapper')
+      );
       const idx = siblings.indexOf(columnWrapper);
-      // Match with the header at the same index
       const columns = getColumns();
-      const matched = columns.find((c) => c.index === idx);
+      const matched = idx >= 0 && idx < columns.length ? columns[idx] : null;
       lastRightClickedColumn = matched ? matched.name : null;
     }
   } else {
@@ -170,38 +196,50 @@ document.addEventListener("contextmenu", (e) => {
 
 // --- Message listener (from background/popup) ---
 
-browser.runtime.onMessage.addListener(async (message) => {
-  switch (message.type) {
-    case "GET_RIGHT_CLICKED_COLUMN": {
-      if (lastRightClickedColumn && currentBoardId) {
-        await browser.runtime.sendMessage({
-          type: "HIDE_COLUMN",
-          boardId: currentBoardId,
-          boardName: getBoardName(),
-          columnName: lastRightClickedColumn,
-        });
-        await onBoardChanged();
-      }
-      return true;
-    }
-    case "GET_COLUMNS": {
-      const columns = getColumns().map((c) => c.name);
-      return { columns, boardId: currentBoardId, boardName: getBoardName() };
-    }
-    case "APPLY_HIDING": {
-      applyHiddenColumns(message.hiddenColumns);
-      return true;
-    }
-    case "SET_SHOW_ALL": {
-      showAllMode = message.enabled;
-      if (showAllMode) {
-        removeAllHiding();
-      } else {
-        await onBoardChanged();
-      }
-      return true;
-    }
-    default:
-      return false;
+function handleContentMessage(message, _sender, sendResponse) {
+  if (!message || typeof message.type !== "string") {
+    sendResponse(false);
+    return false;
   }
-});
+
+  const handler = async () => {
+    switch (message.type) {
+      case "GET_RIGHT_CLICKED_COLUMN": {
+        if (lastRightClickedColumn && currentBoardId) {
+          await browser.runtime.sendMessage({
+            type: "HIDE_COLUMN",
+            boardId: currentBoardId,
+            boardName: getBoardName(),
+            columnName: lastRightClickedColumn,
+          });
+          await onBoardChanged();
+        }
+        return true;
+      }
+      case "GET_COLUMNS": {
+        const columns = getColumns().map((c) => c.name);
+        return { columns, boardId: currentBoardId, boardName: getBoardName(), showAllMode };
+      }
+      case "APPLY_HIDING": {
+        applyHiddenColumns(message.hiddenColumns || []);
+        return true;
+      }
+      case "SET_SHOW_ALL": {
+        showAllMode = !!message.enabled;
+        if (showAllMode) {
+          removeAllHiding();
+        } else {
+          await onBoardChanged();
+        }
+        return true;
+      }
+      default:
+        return false;
+    }
+  };
+
+  handler().then(sendResponse).catch(() => sendResponse(false));
+  return true;
+}
+
+browser.runtime.onMessage.addListener(handleContentMessage);

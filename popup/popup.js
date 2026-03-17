@@ -9,11 +9,15 @@ let showAllActive = false;
 async function init() {
   const [tab] = await browser.tabs.query({ active: true, currentWindow: true });
 
+  if (!tab) {
+    showNoBoard();
+    return;
+  }
+
   let response;
   try {
     response = await browser.tabs.sendMessage(tab.id, { type: "GET_COLUMNS" });
   } catch (e) {
-    // Content script not loaded (not on Asana)
     showNoBoard();
     return;
   }
@@ -25,6 +29,7 @@ async function init() {
 
   currentBoardId = response.boardId;
   currentBoardName = response.boardName;
+  showAllActive = !!response.showAllMode;
   const columns = response.columns;
 
   const boardData = await browser.runtime.sendMessage({
@@ -48,7 +53,7 @@ function showBoardControls(columns, hiddenColumns) {
   document.getElementById("board-name").textContent = currentBoardName;
 
   const list = document.getElementById("column-list");
-  list.innerHTML = "";
+  list.replaceChildren();
 
   columns.forEach((colName) => {
     const isHidden = hiddenColumns.includes(colName);
@@ -70,17 +75,22 @@ function showBoardControls(columns, hiddenColumns) {
     list.appendChild(row);
   });
 
-  // Replace buttons to clear old listeners
   const showAllBtn = document.getElementById("show-all-btn");
   const resetBtn = document.getElementById("reset-btn");
   showAllBtn.replaceWith(showAllBtn.cloneNode(true));
   resetBtn.replaceWith(resetBtn.cloneNode(true));
-  document.getElementById("show-all-btn").addEventListener("click", onShowAll);
+
+  const newShowAllBtn = document.getElementById("show-all-btn");
+  newShowAllBtn.textContent = showAllActive ? "Restore Hidden" : "Show All";
+  newShowAllBtn.classList.toggle("active", showAllActive);
+  newShowAllBtn.addEventListener("click", onShowAll);
+
   document.getElementById("reset-btn").addEventListener("click", onReset);
 }
 
 async function onToggleColumn(columnName, hide) {
   const [tab] = await browser.tabs.query({ active: true, currentWindow: true });
+  if (!tab) return;
 
   if (hide) {
     await browser.runtime.sendMessage({
@@ -97,7 +107,6 @@ async function onToggleColumn(columnName, hide) {
     });
   }
 
-  // Tell content script to re-apply
   const boardData = await browser.runtime.sendMessage({
     type: "GET_BOARD_DATA",
     boardId: currentBoardId,
@@ -111,6 +120,8 @@ async function onToggleColumn(columnName, hide) {
 
 async function onShowAll() {
   const [tab] = await browser.tabs.query({ active: true, currentWindow: true });
+  if (!tab) return;
+
   showAllActive = !showAllActive;
 
   const btn = document.getElementById("show-all-btn");
@@ -125,6 +136,7 @@ async function onShowAll() {
 
 async function onReset() {
   const [tab] = await browser.tabs.query({ active: true, currentWindow: true });
+  if (!tab) return;
 
   await browser.runtime.sendMessage({
     type: "RESET_BOARD",
@@ -136,7 +148,6 @@ async function onReset() {
     hiddenColumns: [],
   });
 
-  // Refresh the popup
   init();
 }
 
