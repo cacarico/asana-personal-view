@@ -25,11 +25,13 @@ function getColumns() {
     '[class*="BoardColumn"]:not([class*="BoardColumnAdd"])'
   );
 
-  return Array.from(columnElements).map((el) => {
-    const headerEl = el.querySelector('[class*="BoardColumnHeader"] textarea, [class*="BoardColumnHeader"] [class*="SectionName"]');
-    const name = headerEl ? headerEl.textContent.trim() : "";
-    return { name, element: el };
-  });
+  return Array.from(columnElements)
+    .map((el) => {
+      const headerEl = el.querySelector('[class*="BoardColumnHeader"] textarea, [class*="BoardColumnHeader"] [class*="SectionName"]');
+      const name = headerEl ? headerEl.textContent.trim() : "";
+      return { name, element: el };
+    })
+    .filter((col) => col.name !== "");
 }
 
 function getBoardName() {
@@ -89,23 +91,27 @@ async function onBoardChanged() {
   if (!boardId || !isBoardView()) {
     currentBoardId = null;
     removeAllHiding();
-    browser.runtime.sendMessage({ type: "UPDATE_BADGE", count: 0 });
+    browser.runtime.sendMessage({ type: "UPDATE_BADGE", count: 0 }).catch(() => {});
     return;
   }
 
   currentBoardId = boardId;
 
-  const boardData = await browser.runtime.sendMessage({
-    type: "GET_BOARD_DATA",
-    boardId,
-  });
+  try {
+    const boardData = await browser.runtime.sendMessage({
+      type: "GET_BOARD_DATA",
+      boardId,
+    });
 
-  applyHiddenColumns(boardData.hiddenColumns || []);
+    applyHiddenColumns(boardData.hiddenColumns || []);
 
-  browser.runtime.sendMessage({
-    type: "UPDATE_BADGE",
-    count: (boardData.hiddenColumns || []).length,
-  });
+    browser.runtime.sendMessage({
+      type: "UPDATE_BADGE",
+      count: (boardData.hiddenColumns || []).length,
+    }).catch(() => {});
+  } catch (e) {
+    // Background script may not be ready yet
+  }
 }
 
 function debouncedBoardCheck() {

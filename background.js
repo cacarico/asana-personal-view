@@ -46,11 +46,13 @@ async function resetBoard(boardId) {
 
 // --- Context menu ---
 
-browser.contextMenus.create({
-  id: "hide-column",
-  title: "Hide this column",
-  contexts: ["page"],
-  documentUrlPatterns: ["*://app.asana.com/*"],
+browser.runtime.onInstalled.addListener(() => {
+  browser.contextMenus.create({
+    id: "hide-column",
+    title: "Hide this column",
+    contexts: ["page"],
+    documentUrlPatterns: ["*://app.asana.com/*"],
+  });
 });
 
 browser.contextMenus.onClicked.addListener(async (info, tab) => {
@@ -61,6 +63,12 @@ browser.contextMenus.onClicked.addListener(async (info, tab) => {
 
 // --- Message handling ---
 
+async function getActiveTabId(sender) {
+  if (sender.tab) return sender.tab.id;
+  const [tab] = await browser.tabs.query({ active: true, currentWindow: true });
+  return tab ? tab.id : null;
+}
+
 browser.runtime.onMessage.addListener(async (message, sender) => {
   switch (message.type) {
     case "GET_BOARD_DATA": {
@@ -69,21 +77,25 @@ browser.runtime.onMessage.addListener(async (message, sender) => {
     }
     case "HIDE_COLUMN": {
       const hidden = await hideColumn(message.boardId, message.boardName, message.columnName);
-      updateBadge(sender.tab.id, hidden.length);
+      const tabId = await getActiveTabId(sender);
+      if (tabId) updateBadge(tabId, hidden.length);
       return { hiddenColumns: hidden };
     }
     case "SHOW_COLUMN": {
       const hidden = await showColumn(message.boardId, message.columnName);
-      updateBadge(sender.tab.id, hidden.length);
+      const tabId = await getActiveTabId(sender);
+      if (tabId) updateBadge(tabId, hidden.length);
       return { hiddenColumns: hidden };
     }
     case "RESET_BOARD": {
       await resetBoard(message.boardId);
-      updateBadge(sender.tab.id, 0);
+      const tabId = await getActiveTabId(sender);
+      if (tabId) updateBadge(tabId, 0);
       return { hiddenColumns: [] };
     }
     case "UPDATE_BADGE": {
-      updateBadge(sender.tab.id, message.count);
+      const tabId = await getActiveTabId(sender);
+      if (tabId) updateBadge(tabId, message.count);
       return true;
     }
     default:
