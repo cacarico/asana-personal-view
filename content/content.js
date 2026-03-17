@@ -21,25 +21,31 @@ let lastRightClickedColumn = null;
 // --- Board detection ---
 
 function isBoardView() {
-  return document.querySelector('[class*="BoardBody"], [class*="BoardColumn"]') !== null;
+  // BoardBody-dragSelectContainer is the main board area
+  return document.querySelector('.BoardBody-dragSelectContainer') !== null;
 }
 
 function getColumns() {
-  const columnElements = document.querySelectorAll(
-    '[class*="BoardColumn"]:not([class*="BoardColumnAdd"])'
+  // Headers are in BoardBody-headerDraggableItemWrapper elements.
+  // Each contains a BoardGroupHeader with an H2 for the column name.
+  // Exclude the BoardAddSection (add column button).
+  const headerWrappers = document.querySelectorAll(
+    '.BoardBody-headerDraggableItemWrapper'
   );
 
-  return Array.from(columnElements)
-    .map((el) => {
-      const headerEl = el.querySelector('[class*="BoardColumnHeader"] textarea, [class*="BoardColumnHeader"] [class*="SectionName"]');
-      const name = headerEl ? headerEl.textContent.trim() : "";
-      return { name, element: el };
+  return Array.from(headerWrappers)
+    .map((el, index) => {
+      const h2 = el.querySelector('.BoardGroupHeaderContents h2');
+      const name = h2 ? h2.textContent.trim() : "";
+      return { name, element: el, index };
     })
     .filter((col) => col.name !== "");
 }
 
 function getBoardName() {
-  const heading = document.querySelector('[class*="ProjectHeader"] h1, [class*="TopbarPageHeaderStructure"] [class*="NavigationLink"]');
+  // Try common project header selectors
+  const heading = document.querySelector('h1[class*="Typography"]') ||
+    document.querySelector('[class*="ProjectHeader"] h1');
   return heading ? heading.textContent.trim() : "Unknown Board";
 }
 
@@ -68,10 +74,18 @@ function applyHiddenColumns(hiddenColumnNames) {
   const columns = getColumns();
   const rules = [];
 
-  columns.forEach((col, index) => {
+  columns.forEach((col) => {
     if (hiddenColumnNames.includes(col.name)) {
+      // nth-child is 1-based; col.index is 0-based position among header wrappers.
+      // Headers and column bodies are in separate SortableLists but share the same index.
+      const nth = col.index + 1;
+      // Hide the header wrapper (in the header sortable list)
       rules.push(
-        `[class*="BoardBody"] > :nth-child(${index + 1}) { display: none !important; }`
+        `.BoardBody-columnSortableList > .BoardBody-headerDraggableItemWrapper:nth-child(${nth}) { display: none !important; }`
+      );
+      // Hide the column body wrapper (in the column sortable list)
+      rules.push(
+        `.BoardBody-columnSortableList > .BoardBody-columnDraggableItemWrapper:nth-child(${nth}) { display: none !important; }`
       );
     }
   });
@@ -148,12 +162,28 @@ setInterval(() => {
 // --- Right-click tracking ---
 
 document.addEventListener("contextmenu", (e) => {
-  const columnEl = e.target.closest('[class*="BoardColumn"]');
-  if (columnEl) {
-    const headerEl = columnEl.querySelector(
-      '[class*="BoardColumnHeader"] textarea, [class*="BoardColumnHeader"] [class*="SectionName"]'
-    );
-    lastRightClickedColumn = headerEl ? headerEl.textContent.trim() : null;
+  // Check if right-click is on a column header area or column body
+  const headerWrapper = e.target.closest('.BoardBody-headerDraggableItemWrapper');
+  const columnWrapper = e.target.closest('.BoardBody-columnDraggableItemWrapper');
+  const target = headerWrapper || columnWrapper;
+
+  if (target) {
+    // If clicked on header, get name directly; if on column body, find matching header by index
+    const h2 = headerWrapper
+      ? headerWrapper.querySelector('.BoardGroupHeaderContents h2')
+      : null;
+    if (h2) {
+      lastRightClickedColumn = h2.textContent.trim();
+    } else if (columnWrapper) {
+      // Find the index of this column wrapper among its siblings
+      const parent = columnWrapper.parentElement;
+      const siblings = Array.from(parent.querySelectorAll('.BoardBody-columnDraggableItemWrapper'));
+      const idx = siblings.indexOf(columnWrapper);
+      // Match with the header at the same index
+      const columns = getColumns();
+      const matched = columns.find((c) => c.index === idx);
+      lastRightClickedColumn = matched ? matched.name : null;
+    }
   } else {
     lastRightClickedColumn = null;
   }
