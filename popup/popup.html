@@ -6,10 +6,22 @@
 </head>
 <body>
   <div id="app">
-    <h1>Asana Personal View</h1>
-    <p id="status">Loading...</p>
-    <div id="column-list"></div>
-    <div id="actions"></div>
+    <div id="header">
+      <h1>Asana Personal View</h1>
+      <p id="board-name"></p>
+    </div>
+
+    <div id="no-board">
+      <p>Navigate to an Asana board to use this extension.</p>
+    </div>
+
+    <div id="board-controls" style="display: none;">
+      <div id="column-list"></div>
+      <div id="actions">
+        <button id="show-all-btn">Show All</button>
+        <button id="reset-btn">Reset</button>
+      </div>
+    </div>
   </div>
   <script src="popup.js"></script>
 </body>
