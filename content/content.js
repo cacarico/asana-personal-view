@@ -3,9 +3,13 @@
 // --- URL parsing ---
 
 function getBoardIdFromUrl() {
-  // Asana board URLs: https://app.asana.com/0/PROJECT_ID/...
-  const match = window.location.pathname.match(/^\/0\/(\d+)/);
-  return match ? match[1] : null;
+  // Asana board URLs can be:
+  //   /0/PROJECT_ID/...  (legacy)
+  //   /1/SHARD_ID/project/PROJECT_ID/board/BOARD_ID  (current)
+  const boardMatch = window.location.pathname.match(/\/project\/(\d+)\/board/);
+  if (boardMatch) return boardMatch[1];
+  const legacyMatch = window.location.pathname.match(/^\/0\/(\d+)/);
+  return legacyMatch ? legacyMatch[1] : null;
 }
 
 // --- State ---
