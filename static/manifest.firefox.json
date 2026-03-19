@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
   "name": "Asana Personal View",
-  "version": "0.2.0",
-  "description": "Hide columns on Asana boards for a personalized view",
+  "version": "0.3.0",
+  "description": "Hide columns on Asana boards and copy git branch commands",
   "browser_specific_settings": {
     "gecko": {
       "id": "asana-personal-view@cacari.co",
@@ -12,13 +12,13 @@
   "permissions": ["storage", "contextMenus"],
   "host_permissions": ["*://app.asana.com/*"],
   "background": {
-    "scripts": ["background.js"],
-    "service_worker": "background.js"
+    "scripts": ["background.js"]
   },
   "content_scripts": [
     {
       "matches": ["*://app.asana.com/*"],
-      "js": ["content/content.js"]
+      "js": ["content.js"],
+      "run_at": "document_idle"
     }
   ],
   "action": {
