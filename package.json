@@ -1,0 +1,18 @@
+{
+  "name": "asana-personal-view",
+  "version": "0.3.0",
+  "private": true,
+  "description": "Asana extension: hide board columns + copy git branch commands",
+  "scripts": {
+    "build": "node esbuild.config.mjs",
+    "build:prod": "node esbuild.config.mjs --minify",
+    "watch": "node esbuild.config.mjs --watch",
+    "typecheck": "tsc --noEmit",
+    "clean": "rm -rf dist"
+  },
+  "devDependencies": {
+    "@types/chrome": "^0.0.287",
+    "esbuild": "^0.24.0",
+    "typescript": "^5.7.0"
+  }
+}

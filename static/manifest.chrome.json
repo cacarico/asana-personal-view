@@ -1,0 +1,29 @@
+{
+  "manifest_version": 3,
+  "name": "Asana Personal View",
+  "version": "0.3.0",
+  "description": "Hide columns on Asana boards and copy git branch commands",
+  "permissions": ["storage", "contextMenus"],
+  "host_permissions": ["*://app.asana.com/*"],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "content_scripts": [
+    {
+      "matches": ["*://app.asana.com/*"],
+      "js": ["content.js"],
+      "run_at": "document_idle"
+    }
+  ],
+  "action": {
+    "default_popup": "popup/popup.html",
+    "default_icon": {
+      "48": "icons/icon-48.svg",
+      "128": "icons/icon-128.svg"
+    }
+  },
+  "icons": {
+    "48": "icons/icon-48.svg",
+    "128": "icons/icon-128.svg"
+  }
+}

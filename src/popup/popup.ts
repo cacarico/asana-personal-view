@@ -1,23 +1,24 @@
-// popup.js — Column toggle UI
+import { browser } from "../lib/browser";
 
-const browser = globalThis.browser || globalThis.chrome;
-
-let currentBoardId = null;
+let currentBoardId: string | null = null;
 let currentBoardName = "";
 let showAllActive = false;
 
-async function init() {
-  const [tab] = await browser.tabs.query({ active: true, currentWindow: true });
+async function init(): Promise<void> {
+  const [tab] = await browser.tabs.query({
+    active: true,
+    currentWindow: true,
+  });
 
-  if (!tab) {
+  if (!tab?.id) {
     showNoBoard();
     return;
   }
 
-  let response;
+  let response: any;
   try {
     response = await browser.tabs.sendMessage(tab.id, { type: "GET_COLUMNS" });
-  } catch (e) {
+  } catch {
     showNoBoard();
     return;
   }
@@ -30,29 +31,32 @@ async function init() {
   currentBoardId = response.boardId;
   currentBoardName = response.boardName;
   showAllActive = !!response.showAllMode;
-  const columns = response.columns;
+  const columns: string[] = response.columns;
 
   const boardData = await browser.runtime.sendMessage({
     type: "GET_BOARD_DATA",
     boardId: currentBoardId,
   });
 
-  const hiddenColumns = boardData.hiddenColumns || [];
+  const hiddenColumns: string[] = boardData.hiddenColumns || [];
 
   showBoardControls(columns, hiddenColumns);
 }
 
-function showNoBoard() {
-  document.getElementById("no-board").style.display = "block";
-  document.getElementById("board-controls").style.display = "none";
+function showNoBoard(): void {
+  document.getElementById("no-board")!.style.display = "block";
+  document.getElementById("board-controls")!.style.display = "none";
 }
 
-function showBoardControls(columns, hiddenColumns) {
-  document.getElementById("no-board").style.display = "none";
-  document.getElementById("board-controls").style.display = "block";
-  document.getElementById("board-name").textContent = currentBoardName;
+function showBoardControls(
+  columns: string[],
+  hiddenColumns: string[],
+): void {
+  document.getElementById("no-board")!.style.display = "none";
+  document.getElementById("board-controls")!.style.display = "block";
+  document.getElementById("board-name")!.textContent = currentBoardName;
 
-  const list = document.getElementById("column-list");
+  const list = document.getElementById("column-list")!;
   list.replaceChildren();
 
   columns.forEach((colName) => {
@@ -64,7 +68,9 @@ function showBoardControls(columns, hiddenColumns) {
     const toggle = document.createElement("input");
     toggle.type = "checkbox";
     toggle.checked = !isHidden;
-    toggle.addEventListener("change", () => onToggleColumn(colName, !toggle.checked));
+    toggle.addEventListener("change", () =>
+      onToggleColumn(colName, !toggle.checked),
+    );
 
     const name = document.createElement("span");
     name.className = "column-name";
@@ -75,22 +81,28 @@ function showBoardControls(columns, hiddenColumns) {
     list.appendChild(row);
   });
 
-  const showAllBtn = document.getElementById("show-all-btn");
-  const resetBtn = document.getElementById("reset-btn");
+  const showAllBtn = document.getElementById("show-all-btn")!;
+  const resetBtn = document.getElementById("reset-btn")!;
   showAllBtn.replaceWith(showAllBtn.cloneNode(true));
   resetBtn.replaceWith(resetBtn.cloneNode(true));
 
-  const newShowAllBtn = document.getElementById("show-all-btn");
+  const newShowAllBtn = document.getElementById("show-all-btn")!;
   newShowAllBtn.textContent = showAllActive ? "Restore Hidden" : "Show All";
   newShowAllBtn.classList.toggle("active", showAllActive);
   newShowAllBtn.addEventListener("click", onShowAll);
 
-  document.getElementById("reset-btn").addEventListener("click", onReset);
+  document.getElementById("reset-btn")!.addEventListener("click", onReset);
 }
 
-async function onToggleColumn(columnName, hide) {
-  const [tab] = await browser.tabs.query({ active: true, currentWindow: true });
-  if (!tab) return;
+async function onToggleColumn(
+  columnName: string,
+  hide: boolean,
+): Promise<void> {
+  const [tab] = await browser.tabs.query({
+    active: true,
+    currentWindow: true,
+  });
+  if (!tab?.id) return;
 
   if (hide) {
     await browser.runtime.sendMessage({
@@ -118,13 +130,16 @@ async function onToggleColumn(columnName, hide) {
   });
 }
 
-async function onShowAll() {
-  const [tab] = await browser.tabs.query({ active: true, currentWindow: true });
-  if (!tab) return;
+async function onShowAll(): Promise<void> {
+  const [tab] = await browser.tabs.query({
+    active: true,
+    currentWindow: true,
+  });
+  if (!tab?.id) return;
 
   showAllActive = !showAllActive;
 
-  const btn = document.getElementById("show-all-btn");
+  const btn = document.getElementById("show-all-btn")!;
   btn.textContent = showAllActive ? "Restore Hidden" : "Show All";
   btn.classList.toggle("active", showAllActive);
 
@@ -134,9 +149,12 @@ async function onShowAll() {
   });
 }
 
-async function onReset() {
-  const [tab] = await browser.tabs.query({ active: true, currentWindow: true });
-  if (!tab) return;
+async function onReset(): Promise<void> {
+  const [tab] = await browser.tabs.query({
+    active: true,
+    currentWindow: true,
+  });
+  if (!tab?.id) return;
 
   await browser.runtime.sendMessage({
     type: "RESET_BOARD",
