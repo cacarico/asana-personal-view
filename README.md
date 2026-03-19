@@ -13,12 +13,20 @@ A Firefox extension that lets you hide columns on Asana board views for a person
 
 ## Installation
 
-### From source (temporary)
+### Firefox (temporary)
 
 1. Clone this repository
 2. Open Firefox and navigate to `about:debugging#/runtime/this-firefox`
 3. Click "Load Temporary Add-on..."
 4. Select the `manifest.json` file from this project
+
+### Chrome (unpacked)
+
+1. Clone this repository
+2. Open Chrome and navigate to `chrome://extensions`
+3. Enable "Developer mode" (toggle in the top-right corner)
+4. Click "Load unpacked"
+5. Select the project folder containing `manifest.json`
 
 ### From .xpi (permanent, unsigned)
 
@@ -33,11 +41,44 @@ A Firefox extension that lets you hide columns on Asana board views for a person
 4. **Show All:** Click "Show All" in the popup to temporarily see everything
 5. **Reset:** Click "Reset" to clear all hidden columns for the current board
 
+### Git Branch Button
+
+When you open a task pane, a GitHub icon button appears in the task toolbar. Clicking it generates a `git checkout -b` command based on the task's custom fields and copies it to your clipboard.
+
+**Branch name pattern:**
+
+```
+<nature-of-ticket>/<id>/<first-5-words-of-title>
+```
+
+**Example:** For a task titled "Create new service" with ID `ID-1514` and Nature `Ad hoc`:
+
+```
+ad-hoc/id-1***/create-new-service
+```
+
+The button reads these fields from the **Masterboard Software Development** project section in the task pane:
+
+| Field  | Source                      | Example               |
+| ------ | --------------------------- | --------------------- |
+| Nature | "Nature of the ticket" enum | `Ad hoc` → `ad-hoc`   |
+| ID     | "ID" text field             | `ID-1514` → `id-1514` |
+| Title  | Task name (first 5 words)   | `create new service`  |
+
+**How to use:**
+
+1. Click on any task to open the task pane
+2. Click the GitHub icon button in the task toolbar
+3. A dropdown appears with the generated command, e.g. `git checkout -b ad-hoc/id-1514/create-new-service`
+4. Click the command to copy it to your clipboard
+5. Paste into your terminal
+
 ## Development
 
 Load as a temporary extension via `about:debugging` for development. Changes to files require reloading the extension.
 
 For live reloading during development:
+
 ```bash
 npx web-ext run --source-dir .
 ```
