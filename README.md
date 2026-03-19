@@ -69,7 +69,7 @@ The button reads these fields from the **Masterboard Software Development** proj
 
 1. Click on any task to open the task pane
 2. Click the GitHub icon button in the task toolbar
-3. A dropdown appears with the generated command, e.g. `git checkout -b ad-hoc/id-1514/classpass-adds-a-new-attribute`
+3. A dropdown appears with the generated command, e.g. `git checkout -b ad-hoc/id-1514/create-new-service`
 4. Click the command to copy it to your clipboard
 5. Paste into your terminal
 
